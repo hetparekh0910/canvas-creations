@@ -1,8 +1,14 @@
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Play } from "lucide-react";
 import StickyNote from "./StickyNote";
+import DemoModal from "./DemoModal";
 
 const Hero = () => {
+  const [demoOpen, setDemoOpen] = useState(false);
+  const navigate = useNavigate();
+
   return (
     <section className="relative min-h-screen bg-hero overflow-hidden pt-20">
       {/* Grid Background */}
@@ -39,11 +45,11 @@ const Hero = () => {
             </p>
             
             <div className="flex flex-wrap gap-4">
-              <Button variant="gradient" size="lg" className="group">
+              <Button variant="gradient" size="lg" className="group" onClick={() => navigate("/auth")}>
                 Start Drawing
                 <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
               </Button>
-              <Button variant="outline" size="lg" className="border-white/20 text-white hover:bg-white/10">
+              <Button variant="outline" size="lg" className="border-white/20 text-white hover:bg-white/10" onClick={() => setDemoOpen(true)}>
                 <Play className="mr-2 h-4 w-4" />
                 Watch Demo
               </Button>
@@ -123,6 +129,8 @@ const Hero = () => {
           </div>
         </div>
       </div>
+
+      <DemoModal open={demoOpen} onOpenChange={setDemoOpen} />
     </section>
   );
 };

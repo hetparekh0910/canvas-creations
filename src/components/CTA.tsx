@@ -1,9 +1,12 @@
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ArrowRight } from "lucide-react";
 
 const CTA = () => {
+  const navigate = useNavigate();
+
   return (
-    <section className="py-24 bg-hero relative overflow-hidden">
+    <section id="pricing" className="py-24 bg-hero relative overflow-hidden">
       {/* Background Elements */}
       <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary/20 rounded-full blur-[128px]" />
       <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-accent/20 rounded-full blur-[128px]" />
@@ -18,11 +21,11 @@ const CTA = () => {
             Join thousands of teams who've made Canvas their creative home. Start free, upgrade when you're ready.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button variant="gradient" size="lg" className="group text-lg px-8">
+            <Button variant="gradient" size="lg" className="group text-lg px-8" onClick={() => navigate("/auth")}>
               Start Drawing — It's Free
               <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
             </Button>
-            <Button variant="outline" size="lg" className="border-white/20 text-white hover:bg-white/10 text-lg px-8">
+            <Button variant="outline" size="lg" className="border-white/20 text-white hover:bg-white/10 text-lg px-8" onClick={() => window.location.href = "mailto:sales@canvas.com"}>
               Talk to Sales
             </Button>
           </div>

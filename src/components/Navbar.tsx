@@ -1,15 +1,26 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Menu, X } from "lucide-react";
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
+  const navigate = useNavigate();
 
   const navLinks = [
     { label: "Product", href: "#product" },
     { label: "Solutions", href: "#solutions" },
     { label: "Pricing", href: "#pricing" },
   ];
+
+  const scrollToSection = (href: string) => {
+    const id = href.replace("#", "");
+    const el = document.getElementById(id);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth" });
+    }
+    setIsOpen(false);
+  };
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-hero/80 backdrop-blur-lg border-b border-white/10">
@@ -26,22 +37,22 @@ const Navbar = () => {
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center gap-8">
             {navLinks.map((link) => (
-              <a
+              <button
                 key={link.label}
-                href={link.href}
+                onClick={() => scrollToSection(link.href)}
                 className="text-white/70 hover:text-white transition-colors duration-200 text-sm font-medium"
               >
                 {link.label}
-              </a>
+              </button>
             ))}
           </div>
 
           {/* Desktop CTA */}
           <div className="hidden md:flex items-center gap-4">
-            <Button variant="ghost" className="text-white/70 hover:text-white hover:bg-white/10">
+            <Button variant="ghost" className="text-white/70 hover:text-white hover:bg-white/10" onClick={() => navigate("/auth")}>
               Log in
             </Button>
-            <Button variant="gradient" size="default">
+            <Button variant="gradient" size="default" onClick={() => navigate("/auth")}>
               Start Drawing
             </Button>
           </div>
@@ -60,19 +71,19 @@ const Navbar = () => {
           <div className="md:hidden mt-4 pb-4 border-t border-white/10 pt-4">
             <div className="flex flex-col gap-4">
               {navLinks.map((link) => (
-                <a
+                <button
                   key={link.label}
-                  href={link.href}
-                  className="text-white/70 hover:text-white transition-colors duration-200 text-sm font-medium"
+                  onClick={() => scrollToSection(link.href)}
+                  className="text-white/70 hover:text-white transition-colors duration-200 text-sm font-medium text-left"
                 >
                   {link.label}
-                </a>
+                </button>
               ))}
               <div className="flex flex-col gap-2 mt-4">
-                <Button variant="ghost" className="text-white/70 hover:text-white hover:bg-white/10 justify-start">
+                <Button variant="ghost" className="text-white/70 hover:text-white hover:bg-white/10 justify-start" onClick={() => navigate("/auth")}>
                   Log in
                 </Button>
-                <Button variant="gradient">
+                <Button variant="gradient" onClick={() => navigate("/auth")}>
                   Start Drawing
                 </Button>
               </div>
