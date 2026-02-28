@@ -3,17 +3,42 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ArrowLeft } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const { toast } = useToast();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO: Wire up with Lovable Cloud auth
-    console.log(isLogin ? "Login" : "Signup", { email, password });
+    setLoading(true);
+
+    try {
+      if (isLogin) {
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+        toast({ title: "Welcome back!", description: "You've been logged in successfully." });
+        navigate("/canvas");
+      } else {
+        const { error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: { emailRedirectTo: window.location.origin },
+        });
+        if (error) throw error;
+        toast({ title: "Account created!", description: "You're now signed in." });
+        navigate("/canvas");
+      }
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -67,11 +92,12 @@ const Auth = () => {
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
                 required
+                minLength={6}
                 className="bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:border-primary"
               />
             </div>
-            <Button variant="gradient" className="w-full" type="submit">
-              {isLogin ? "Log in" : "Create account"}
+            <Button variant="gradient" className="w-full" type="submit" disabled={loading}>
+              {loading ? "Please wait..." : isLogin ? "Log in" : "Create account"}
             </Button>
           </form>
 
