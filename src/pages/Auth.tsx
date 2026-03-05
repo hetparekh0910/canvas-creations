@@ -23,7 +23,7 @@ const Auth = () => {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
         toast({ title: "Welcome back!", description: "You've been logged in successfully." });
-        navigate("/canvas");
+        navigate("/dashboard");
       } else {
         const { error } = await supabase.auth.signUp({
           email,
@@ -32,7 +32,7 @@ const Auth = () => {
         });
         if (error) throw error;
         toast({ title: "Account created!", description: "You're now signed in." });
-        navigate("/canvas");
+        navigate("/dashboard");
       }
     } catch (error: any) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
