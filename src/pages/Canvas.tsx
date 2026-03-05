@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import {
   MousePointer2, Square, Circle, Minus, Type, Pencil,
   Undo2, Redo2, ZoomIn, ZoomOut, LogOut, Save, Trash2,
-  Diamond, ArrowRight,
+  Diamond, ArrowRight, LayoutDashboard,
 } from "lucide-react";
 
 type Tool = "select" | "rectangle" | "circle" | "line" | "text" | "pencil" | "diamond" | "arrow";
@@ -35,53 +35,53 @@ const COLORS = [
 
 const Canvas = () => {
   const navigate = useNavigate();
+  const { id: drawingId } = useParams<{ id: string }>();
   const { user, loading, signOut } = useAuth();
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [tool, setTool] = useState<Tool>("select");
+  const [tool, setTool] = useState<Tool>("rectangle");
   const [elements, setElements] = useState<CanvasElement[]>([]);
   const [history, setHistory] = useState<CanvasElement[][]>([[]]);
   const [historyIndex, setHistoryIndex] = useState(0);
   const [isDrawing, setIsDrawing] = useState(false);
-  const [currentElement, setCurrentElement] = useState<CanvasElement | null>(null);
+  const currentElementRef = useRef<CanvasElement | null>(null);
+  const [renderTick, setRenderTick] = useState(0);
   const [color, setColor] = useState(COLORS[0]);
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
-  const [drawingId, setDrawingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [title, setTitle] = useState("Untitled");
 
   // Redirect if not logged in
   useEffect(() => {
     if (!loading && !user) navigate("/auth");
   }, [user, loading, navigate]);
 
-  // Load or create drawing
+  // Load drawing by ID
   useEffect(() => {
-    if (!user) return;
-    const loadDrawing = async () => {
-      const { data } = await supabase
+    if (!user || !drawingId) return;
+    let cancelled = false;
+    const load = async () => {
+      const { data, error } = await supabase
         .from("drawings")
         .select("*")
+        .eq("id", drawingId)
         .eq("user_id", user.id)
-        .order("updated_at", { ascending: false })
-        .limit(1);
+        .single();
 
-      if (data && data.length > 0) {
-        setDrawingId(data[0].id);
-        const els = (data[0].elements as unknown as CanvasElement[]) || [];
-        setElements(els);
-        setHistory([els]);
-        setHistoryIndex(0);
-      } else {
-        const { data: newDrawing } = await supabase
-          .from("drawings")
-          .insert({ user_id: user.id, title: "My Canvas", elements: [] })
-          .select()
-          .single();
-        if (newDrawing) setDrawingId(newDrawing.id);
+      if (cancelled) return;
+      if (error || !data) {
+        navigate("/dashboard");
+        return;
       }
+      const els = (data.elements as unknown as CanvasElement[]) || [];
+      setElements(els);
+      setHistory([els]);
+      setHistoryIndex(0);
+      setTitle(data.title || "Untitled");
     };
-    loadDrawing();
-  }, [user]);
+    load();
+    return () => { cancelled = true; };
+  }, [user, drawingId]);
 
   // Draw canvas
   const draw = useCallback(() => {
@@ -124,7 +124,8 @@ const Canvas = () => {
     }
 
     // Draw elements
-    const allElements = currentElement ? [...elements, currentElement] : elements;
+    const cur = currentElementRef.current;
+    const allElements = cur ? [...elements, cur] : elements;
     for (const el of allElements) {
       ctx.strokeStyle = el.color;
       ctx.fillStyle = el.color + "20";
@@ -139,7 +140,7 @@ const Canvas = () => {
           ctx.fill();
           ctx.stroke();
           break;
-        case "circle":
+        case "circle": {
           ctx.beginPath();
           const rx = Math.abs(el.width) / 2;
           const ry = Math.abs(el.height) / 2;
@@ -147,7 +148,8 @@ const Canvas = () => {
           ctx.fill();
           ctx.stroke();
           break;
-        case "diamond":
+        }
+        case "diamond": {
           ctx.beginPath();
           const cx = el.x + el.width / 2;
           const cy = el.y + el.height / 2;
@@ -159,18 +161,18 @@ const Canvas = () => {
           ctx.fill();
           ctx.stroke();
           break;
+        }
         case "line":
           ctx.beginPath();
           ctx.moveTo(el.x, el.y);
           ctx.lineTo(el.x + el.width, el.y + el.height);
           ctx.stroke();
           break;
-        case "arrow":
+        case "arrow": {
           ctx.beginPath();
           ctx.moveTo(el.x, el.y);
           ctx.lineTo(el.x + el.width, el.y + el.height);
           ctx.stroke();
-          // Arrowhead
           const angle = Math.atan2(el.height, el.width);
           const headLen = 15;
           ctx.beginPath();
@@ -186,6 +188,7 @@ const Canvas = () => {
           );
           ctx.stroke();
           break;
+        }
         case "pencil":
           if (el.points && el.points.length > 1) {
             ctx.beginPath();
@@ -204,7 +207,7 @@ const Canvas = () => {
       }
     }
     ctx.restore();
-  }, [elements, currentElement, zoom, pan]);
+  }, [elements, renderTick, zoom, pan]);
 
   useEffect(() => {
     draw();
@@ -221,7 +224,6 @@ const Canvas = () => {
   const handleMouseDown = (e: React.MouseEvent) => {
     if (tool === "select") return;
     const point = getCanvasPoint(e);
-    setIsDrawing(true);
 
     if (tool === "text") {
       const text = prompt("Enter text:");
@@ -255,41 +257,48 @@ const Canvas = () => {
       color,
       strokeWidth: 2,
     };
-    setCurrentElement(newEl);
+    currentElementRef.current = newEl;
+    setIsDrawing(true);
+    setRenderTick((t) => t + 1);
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
-    if (!isDrawing || !currentElement) return;
+    if (!isDrawing || !currentElementRef.current) return;
     const point = getCanvasPoint(e);
+    const cur = currentElementRef.current;
 
-    if (currentElement.type === "pencil") {
-      setCurrentElement({
-        ...currentElement,
-        points: [...(currentElement.points || []), { x: point.x, y: point.y }],
-      });
+    if (cur.type === "pencil") {
+      currentElementRef.current = {
+        ...cur,
+        points: [...(cur.points || []), { x: point.x, y: point.y }],
+      };
     } else {
-      setCurrentElement({
-        ...currentElement,
-        width: point.x - currentElement.x,
-        height: point.y - currentElement.y,
-      });
+      currentElementRef.current = {
+        ...cur,
+        width: point.x - cur.x,
+        height: point.y - cur.y,
+      };
     }
+    setRenderTick((t) => t + 1);
   };
 
   const handleMouseUp = () => {
-    if (!isDrawing || !currentElement) return;
+    if (!isDrawing || !currentElementRef.current) return;
     setIsDrawing(false);
-    const newElements = [...elements, currentElement];
+    const newElements = [...elements, currentElementRef.current];
+    currentElementRef.current = null;
     setElements(newElements);
-    setCurrentElement(null);
     pushHistory(newElements);
+    setRenderTick((t) => t + 1);
   };
 
   const pushHistory = (newElements: CanvasElement[]) => {
-    const newHistory = history.slice(0, historyIndex + 1);
-    newHistory.push(newElements);
-    setHistory(newHistory);
-    setHistoryIndex(newHistory.length - 1);
+    setHistory((prev) => {
+      const newHistory = prev.slice(0, historyIndex + 1);
+      newHistory.push(newElements);
+      setHistoryIndex(newHistory.length - 1);
+      return newHistory;
+    });
   };
 
   const undo = () => {
@@ -379,10 +388,17 @@ const Canvas = () => {
       {/* Left actions */}
       <div className="absolute top-4 left-4 z-20 flex items-center gap-2">
         <div className="flex items-center gap-2 bg-white/10 border border-white/10 backdrop-blur-md rounded-xl p-1.5">
+          <button
+            onClick={() => navigate("/dashboard")}
+            className="p-2 text-white/60 hover:text-white rounded-lg hover:bg-white/10 transition-colors"
+            title="Dashboard"
+          >
+            <LayoutDashboard size={18} />
+          </button>
           <div className="w-7 h-7 bg-gradient-primary rounded-lg flex items-center justify-center">
             <span className="text-white font-bold text-xs">C</span>
           </div>
-          <span className="text-white font-semibold text-sm pr-2">Canvas</span>
+          <span className="text-white font-semibold text-sm pr-2">{title}</span>
         </div>
       </div>
 
@@ -420,7 +436,7 @@ const Canvas = () => {
       {/* Canvas */}
       <canvas
         ref={canvasRef}
-        className="absolute inset-0 cursor-crosshair"
+        className="absolute inset-0 z-10 cursor-crosshair"
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
